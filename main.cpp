@@ -38,6 +38,8 @@ struct Camera{
 struct Input{
     bool wPressed;
     bool sPressed;
+    bool aPressed;
+    bool dPressed;
 };
 
 static Camera camera;
@@ -266,6 +268,21 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     if (key == GLFW_KEY_S && action == GLFW_RELEASE) {
         input.sPressed = false;
     }
+    if (key == GLFW_KEY_A && action == GLFW_PRESS) {
+        camera.move_angle = -90;
+        input.aPressed = true;
+
+    }
+    if (key == GLFW_KEY_A && action == GLFW_RELEASE) {
+        input.aPressed = false;
+    }
+    if (key == GLFW_KEY_D && action == GLFW_PRESS) {
+        camera.move_angle = 90;
+        input.dPressed = true;
+    }
+    if (key == GLFW_KEY_D && action == GLFW_RELEASE) {
+        input.dPressed = false;
+    }
 
 }
 
@@ -280,7 +297,7 @@ static void calculateViewMatrix(Camera* camera){
 static void updateMovement(Camera* camera) {
 
 
-    if(input.wPressed || input.sPressed) {
+    if(input.wPressed || input.sPressed || input.aPressed || input.dPressed) {
         camera->pushing = 1;
     }
 
@@ -292,16 +309,27 @@ static void updateMovement(Camera* camera) {
 //        camera->pos[0] += -0.1f * camera->viewMatrix.m[2] * ((camera->move_angle == 180 )? -1:1);
 //        camera->pos[2] += -0.1f * camera->viewMatrix.m[10] * ((camera->move_angle == 180 )? -1:1);
 
-        camera->velocity.v[0] =(float)(camera->velocity.v[0] * (1-acceleration) + ( camera->viewMatrix.m[2]) * ((camera->move_angle == 180 )? -1:1) * (acceleration *maxVelocity));
-        camera->velocity.v[2] =(float)(camera->velocity.v[2] * (1-acceleration) + ( camera->viewMatrix.m[10]) * ((camera->move_angle == 180 )? -1:1) * (acceleration *maxVelocity));
+        if(camera->move_angle == 90.0f || camera->move_angle == -90.0f) {
+            vec3 left = cross(vec3(camera->viewMatrix.m[2],camera->viewMatrix.m[6],camera->viewMatrix.m[10]),
+                              vec3(camera->viewMatrix.m[1],camera->viewMatrix.m[5],camera->viewMatrix.m[9]));
 
+            camera->velocity.v[0] =(float)(camera->velocity.v[0] * (1-acceleration) +
+                                           ( left.v[0]) * ((camera->move_angle == 90 )? 1:-1) * (acceleration *maxVelocity));
+            camera->velocity.v[2] =(float)(camera->velocity.v[2] * (1-acceleration) +
+                                           ( left.v[2]) * ((camera->move_angle == 90 )? 1:-1) * (acceleration *maxVelocity));
+        }else{
+            camera->velocity.v[0] =(float)(camera->velocity.v[0] * (1-acceleration) +
+                    ( camera->viewMatrix.m[2]) * ((camera->move_angle == 180 )? -1:1) * (acceleration *maxVelocity));
+            camera->velocity.v[2] =(float)(camera->velocity.v[2] * (1-acceleration) +
+                    ( camera->viewMatrix.m[10]) * ((camera->move_angle == 180 )? -1:1) * (acceleration *maxVelocity));
+        }
         camera->moving = true;
     }
 
     if (camera->moving) {
 
-        camera->pos[0] += -camera->velocity.v[0] *0.1f;
-        camera->pos[2] += -camera->velocity.v[2] *0.1f;
+        camera->pos[0] += -camera->velocity.v[0] *0.02f;
+        camera->pos[2] += -camera->velocity.v[2] *0.02f;
 
         if(dot(camera->velocity,camera->velocity) < 1e-9) {
             printf("Stopping\n");
@@ -313,7 +341,6 @@ static void updateMovement(Camera* camera) {
     if(camera->pushing){
         camera->pushing = -1.0f;
     }
-
 
     calculateViewMatrix(camera);
     glUniformMatrix4fv(camera->view_mat_location, 1, GL_FALSE, camera->viewMatrix.m);

@@ -35,11 +35,11 @@
       <file leaf-file-name="main.cpp" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/main.cpp">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.24764468">
-              <caret line="281" column="0" selection-start-line="281" selection-start-column="0" selection-end-line="281" selection-end-column="0" />
+            <state vertical-scroll-proportion="0.5666218">
+              <caret line="327" column="0" selection-start-line="327" selection-start-column="0" selection-end-line="327" selection-end-column="0" />
               <folding>
                 <element signature="e#0#20#0" expanded="true" />
-                <marker date="1448593652680" expanded="true" signature="6542:6559" placeholder="{...}" />
+                <marker date="1448605862788" expanded="true" signature="6580:6597" placeholder="{...}" />
               </folding>
             </state>
           </provider>
@@ -264,19 +264,19 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/utils/maths_funcs.cpp">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.4813864">
-          <caret line="67" column="13" selection-start-line="67" selection-start-column="13" selection-end-line="67" selection-end-column="13" />
+        <state vertical-scroll-proportion="0.33243608">
+          <caret line="243" column="5" selection-start-line="243" selection-start-column="5" selection-end-line="243" selection-end-column="5" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/main.cpp">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.24764468">
-          <caret line="281" column="0" selection-start-line="281" selection-start-column="0" selection-end-line="281" selection-end-column="0" />
+        <state vertical-scroll-proportion="0.5666218">
+          <caret line="327" column="0" selection-start-line="327" selection-start-column="0" selection-end-line="327" selection-end-column="0" />
           <folding>
             <element signature="e#0#20#0" expanded="true" />
-            <marker date="1448593652680" expanded="true" signature="6542:6559" placeholder="{...}" />
+            <marker date="1448605862788" expanded="true" signature="6580:6597" placeholder="{...}" />
           </folding>
         </state>
       </provider>
