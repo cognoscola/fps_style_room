@@ -15,28 +15,39 @@ struct Camera{
     float pos[3]; // don't start at zero, or we will be too close
     float yaw = 0.0f; // y-rotation in degrees
     float pitch = 0.0f;
-
     float signal_amplifier = 0.1f;
-
     mat4 T;
-    mat4 R;
-    mat4 R2;
+    mat4 Rpitch;
+    mat4 Ryaw;
     mat4 viewMatrix;
 
     GLint view_mat_location;
     GLint proj_mat_location;
 
-    float resultQuat[4];
     float quatYaw[4];
     float quatPitch[4];
 
+    int pushing; //-1 slowing down, +1 accelerating , 0 = idle
+    bool moving; //velocity != 0
+    double move_angle;
+    double look_angle;
+
+    vec3 velocity; //actor's velocity
+};
+
+struct Input{
+    bool wPressed;
+    bool sPressed;
 };
 
 static Camera camera;
 static Hardware hardware;
+static Input input;
 
 static void cursor_position_callback(GLFWwindow *window, double xpos, double ypos);
-
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+static void calculateViewMatrix(Camera* camera);
+static void updateMovement(Camera* camera);
 
 int main () {
     GLFWwindow* window = NULL;
@@ -62,7 +73,6 @@ int main () {
             0.0f, 0.5f, 1.0f,
             0.5f, -0.5f, 1.0f,
             -0.5f, -0.5f, 1.0f,
-
     };
 
     /*Shader Stuff*/
@@ -108,8 +118,11 @@ int main () {
     glewExperimental = GL_TRUE;
     glewInit ();
 
+
     glfwSetCursorPosCallback(window,cursor_position_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetKeyCallback(window, key_callback);
+    glfwSetInputMode(window,GLFW_STICKY_KEYS, 1);
 
     /* get version info */
     renderer = glGetString (GL_RENDERER); /* get renderer string */
@@ -174,9 +187,9 @@ int main () {
     camera.pos[1] = 0.0f; // don't start at zero, or we will be too close
     camera.pos[2] = 0.5f; // don't start at zero, or we will be too close
     camera.T = translate (identity_mat4 (), vec3 (-camera.pos[0], -camera.pos[1], -camera.pos[2]));
-    camera.R = rotate_y_deg (identity_mat4 (), -camera.yaw);
-    camera.R2 = rotate_y_deg (identity_mat4 (), -camera.yaw);
-    camera.viewMatrix = camera.R * camera.T;
+    camera.Rpitch = rotate_y_deg (identity_mat4 (), -camera.yaw);
+    camera.Ryaw = rotate_y_deg (identity_mat4 (), -camera.yaw);
+    camera.viewMatrix = camera.Rpitch * camera.T;
 
     glUseProgram(shader_programme);
 
@@ -188,17 +201,18 @@ int main () {
 
 
     while (!glfwWindowShouldClose (window)) {
-        glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glViewport (0, 0, hardware.vmode->width,hardware.vmode->height);
-        glUseProgram (shader_programme);
-        glBindVertexArray (vao);
-        glDrawArrays (GL_TRIANGLES, 0, 12);
-        glfwPollEvents ();
+        updateMovement(&camera);
 
-        if (GLFW_PRESS == glfwGetKey (window, GLFW_KEY_ESCAPE)) {
-            glfwSetWindowShouldClose (window, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, hardware.vmode->width, hardware.vmode->height);
+        glUseProgram(shader_programme);
+        glBindVertexArray(vao);
+        glDrawArrays(GL_TRIANGLES, 0, 12);
+        glfwPollEvents();
+        if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_ESCAPE)) {
+            glfwSetWindowShouldClose(window, 1);
         }
-        glfwSwapBuffers (window);
+        glfwSwapBuffers(window);
     }
 
     /* close GL context and any other GLFW resources */
@@ -208,7 +222,6 @@ int main () {
 
 static void cursor_position_callback(GLFWwindow *window, double xpos, double ypos) {
 
-    printf("Mouse moved at X: %f Y:%f\n", xpos, ypos);
 
     //calculate pitch
     static double  previous_ypos = ypos;
@@ -223,20 +236,87 @@ static void cursor_position_callback(GLFWwindow *window, double xpos, double ypo
     camera.yaw += position_x_difference *camera.signal_amplifier;
     camera.pitch += position_y_difference *camera.signal_amplifier;
 
-    create_versor(camera.quatPitch, -camera.pitch, 1.0f, 0.0f, 0.0f);
-    create_versor(camera.quatYaw, -camera.yaw, 0.0f, 1.0f, 0.0f);
+    create_versor(camera.quatPitch, camera.pitch, 1.0f, 0.0f, 0.0f);
+    create_versor(camera.quatYaw, camera.yaw, 0.0f, 1.0f, 0.0f);
 
-    quat_to_mat4(camera.R.m, camera.quatPitch);
-    quat_to_mat4(camera.R2.m, camera.quatYaw);
-
+    quat_to_mat4(camera.Rpitch.m, camera.quatPitch);
+    quat_to_mat4(camera.Ryaw.m, camera.quatYaw);
 
 //    mult_quat_quat(camera.resultQuat, camera.quatYaw, camera.quatPitch);
 //    mult_quat_quat(camera.resultQuat, camera.quatYaw, camera.quatPitch);
 //    quat_to_mat4(camera.R.m, camera.resultQuat);
 
-    //first find Translation, then pitch, then yaw
-    camera.viewMatrix = camera.R *camera.R2 * camera.T;
-    glUniformMatrix4fv (camera.view_mat_location, 1, GL_FALSE, camera.viewMatrix.m);
+}
+
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+
+    if (key == GLFW_KEY_W &&  action == GLFW_PRESS) {
+        printf("Pressed W\n");
+        camera.move_angle = 0;
+        input.wPressed = true;
+    }
+    if (key == GLFW_KEY_W && action == GLFW_RELEASE) {
+        input.wPressed = false;
+    }
+    if (key == GLFW_KEY_S &&  action == GLFW_PRESS ) {
+        printf("Pressed s\n");
+        input.sPressed = true;
+        camera.move_angle = 180;
+    }
+    if (key == GLFW_KEY_S && action == GLFW_RELEASE) {
+        input.sPressed = false;
+    }
+
+}
+
+
+static void calculateViewMatrix(Camera* camera){
+    camera->T = translate (identity_mat4 (), vec3 (-camera->pos[0], -camera->pos[1], -camera->pos[2]));
+    camera->viewMatrix = camera->Rpitch * camera->Ryaw * camera->T;
+
+//    printf("X:%f Y:%f Z:%f\n",  camera->viewMatrix.m[2], camera->viewMatrix.m[6],camera->viewMatrix.m[10]);
+}
+
+static void updateMovement(Camera* camera) {
+
+
+    if(input.wPressed || input.sPressed) {
+        camera->pushing = 1;
+    }
+
+    if (camera->pushing) {
+
+        const double maxVelocity = 0.1 * (camera->pushing> 0);
+        const double acceleration= camera->pushing>0 ? 0.2:0.1;
+
+//        camera->pos[0] += -0.1f * camera->viewMatrix.m[2] * ((camera->move_angle == 180 )? -1:1);
+//        camera->pos[2] += -0.1f * camera->viewMatrix.m[10] * ((camera->move_angle == 180 )? -1:1);
+
+        camera->velocity.v[0] =(float)(camera->velocity.v[0] * (1-acceleration) + ( camera->viewMatrix.m[2]) * ((camera->move_angle == 180 )? -1:1) * (acceleration *maxVelocity));
+        camera->velocity.v[2] =(float)(camera->velocity.v[2] * (1-acceleration) + ( camera->viewMatrix.m[10]) * ((camera->move_angle == 180 )? -1:1) * (acceleration *maxVelocity));
+
+        camera->moving = true;
+    }
+
+    if (camera->moving) {
+
+        camera->pos[0] += -camera->velocity.v[0] *0.1f;
+        camera->pos[2] += -camera->velocity.v[2] *0.1f;
+
+        if(dot(camera->velocity,camera->velocity) < 1e-9) {
+            printf("Stopping\n");
+            camera->velocity.v[0] = camera->velocity.v[2] = camera->velocity.v[1] = 0.0f;
+            camera->pushing = 0;
+            camera->moving = false;
+        }
+    }
+    if(camera->pushing){
+        camera->pushing = -1.0f;
+    }
+
+
+    calculateViewMatrix(camera);
+    glUniformMatrix4fv(camera->view_mat_location, 1, GL_FALSE, camera->viewMatrix.m);
 
 }
 
